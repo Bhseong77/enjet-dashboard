@@ -1,0 +1,30 @@
+name: PPT Briefing Deploy
+
+on:
+  repository_dispatch:
+    types: [new-ppt-uploaded]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Create briefing HTML
+        env:
+          PPT_SUMMARY: ${{ github.event.client_payload.summary }}
+          WEEK: ${{ github.event.client_payload.week }}
+        run: |
+          mkdir -p briefing
+          cat > briefing/${WEEK}.html << 'EOF'
+          ${{ github.event.client_payload.html }}
+          EOF
+          
+      - name: Commit and push
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Add briefing ${WEEK}"
+          git push
