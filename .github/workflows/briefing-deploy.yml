@@ -1,30 +1,37 @@
 name: PPT Briefing Deploy
 
 on:
-  repository_dispatch:
-    types: [new-ppt-uploaded]
+  schedule:
+    - cron: '0 23 * * 0'  # 매주 일요일 밤 11시 (한국시간 월요일 오전 8시)
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Create briefing HTML
-        env:
-          PPT_SUMMARY: ${{ github.event.client_payload.summary }}
-          WEEK: ${{ github.event.client_payload.week }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
         run: |
-          mkdir -p briefing
-          cat > briefing/${WEEK}.html << 'EOF'
-          ${{ github.event.client_payload.html }}
-          EOF
-          
+          pip install requests python-pptx msal anthropic
+
+      - name: Run briefing generator
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          SP_CLIENT_ID: ${{ secrets.SP_CLIENT_ID }}
+          SP_CLIENT_SECRET: ${{ secrets.SP_CLIENT_SECRET }}
+          SP_TENANT_ID: ${{ secrets.SP_TENANT_ID }}
+        run: python generate_briefing.py
+
       - name: Commit and push
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add .
-          git commit -m "Add briefing ${WEEK}"
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto briefing update"
           git push
